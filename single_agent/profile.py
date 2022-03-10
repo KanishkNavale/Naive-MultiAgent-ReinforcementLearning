@@ -1,11 +1,10 @@
 import os
 import json
 
-import numpy as np
 import matplotlib.pyplot as plt
 
 # Init. path
-data_path = os.path.abspath('data')
+data_path = os.path.abspath('single_agent/data')
 
 with open(os.path.join(data_path, 'training_info.json')) as f:
     train_data = json.load(f)
@@ -19,11 +18,10 @@ average = [data["Moving Mean of Episodic Rewards"] for data in train_data]
 test = [data["Test Score"] for data in test_data]
 
 # Generate graphs
-fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(10, 3))
+fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(10, 5))
 
-
-axes[0].plot(score, alpha=0.5, label='Episodic summed rewards')
-axes[0].plot(average, label='Moving mean')
+axes[0].plot(score, alpha=0.5, label='Episodic summation')
+axes[0].plot(average, label='Moving mean of 100 episodes')
 axes[0].grid(True)
 axes[0].set_xlabel('Training Episodes')
 axes[0].set_ylabel('Rewards')

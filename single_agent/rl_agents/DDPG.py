@@ -16,19 +16,19 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class Critic(torch.nn.Module):
     """Defines a Critic Deep Learning Network"""
 
-    def __init__(self, input_dim, beta, density=512, name='critic'):
+    def __init__(self, input_dim: int, beta: float, density: int = 512, name: str = 'critic'):
         super(Critic, self).__init__()
 
         self.model_name = name
         self.checkpoint = self.model_name
 
         # Architecture
-        self.H1 = torch.nn.Linear(input_dim, density)
-        self.H2 = torch.nn.Linear(density, density)
+        self.H1 = torch.nn.Linear(input_dim, density, dtype=torch.float32)
+        self.H2 = torch.nn.Linear(density, density, dtype=torch.float32)
         self.drop = torch.nn.Dropout(p=0.1)
-        self.H3 = torch.nn.Linear(density, density)
-        self.H4 = torch.nn.Linear(density, density)
-        self.Q = torch.nn.Linear(density, 1)
+        self.H3 = torch.nn.Linear(density, density, dtype=torch.float32)
+        self.H4 = torch.nn.Linear(density, density, dtype=torch.float32)
+        self.Q = torch.nn.Linear(density, 1, dtype=torch.float32)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=beta)
         self.to(device)
@@ -53,19 +53,19 @@ class Critic(torch.nn.Module):
 class Actor(torch.nn.Module):
     """Defines a Actor Deep Learning Network"""
 
-    def __init__(self, input_dim, n_actions, alpha, density=512, name='actor'):
+    def __init__(self, input_dim: int, n_actions: int, alpha: float, density: int = 512, name='actor'):
         super(Actor, self).__init__()
 
         self.model_name = name
         self.checkpoint = self.model_name
 
         # Architecture
-        self.H1 = torch.nn.Linear(input_dim, density)
-        self.H2 = torch.nn.Linear(density, density)
+        self.H1 = torch.nn.Linear(input_dim, density, dtype=torch.float32)
+        self.H2 = torch.nn.Linear(density, density, dtype=torch.float32)
         self.drop = torch.nn.Dropout(p=0.1)
-        self.H3 = torch.nn.Linear(density, density)
-        self.H4 = torch.nn.Linear(density, density)
-        self.mu = torch.nn.Linear(density, n_actions)
+        self.H3 = torch.nn.Linear(density, density, dtype=torch.float32)
+        self.H4 = torch.nn.Linear(density, density, dtype=torch.float32)
+        self.mu = torch.nn.Linear(density, n_actions, dtype=torch.float32)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=alpha)
         self.to(device)
@@ -87,33 +87,35 @@ class Actor(torch.nn.Module):
 
 
 class Agent:
-    def __init__(self, env: Env, datapath=None, n_games=250,
-                 alpha=0.0001, beta=0.002, gamma=0.99, tau=0.0035, batch_size=64,
-                 noise='normal', per_alpha=0.6, per_beta=0.4):
+    def __init__(self, env: Env, datapath: str = 'tmp/', n_games: int = 250, training: bool = True,
+                 alpha=0.0001, beta=0.002, gamma=0.99, tau=0.004,
+                 batch_size: int = 64, noise: str = 'normal',
+                 per_alpha: float = 0.6, per_beta: float = 0.4):
 
         self.gamma = torch.tensor(gamma, dtype=torch.float32, device=device)
-        self.tau = torch.tensor(tau, dtype=torch.float32, device=device)
-        self.n_actions = env.action_space.shape[0]
-        self.obs_shape = env.observation_space.shape[0]
+        self.tau = tau
+        self.n_actions: int = env.action_space.shape[0]
+        self.obs_shape: int = env.observation_space.shape[0]
         self.datapath = datapath
         self.n_games = n_games
-        self.optim_steps = 0
-        self.max_size = 2500000
+        self.optim_steps: int = 0
+        self.max_size: int = 2500000
+        self.is_training = training
         self.memory = PrioritizedReplayBuffer(self.max_size, per_alpha)
-        self.beta_scheduler = LinearSchedule(n_games, per_beta, 0.99)
+        self.beta_scheduler = LinearSchedule(n_games, per_beta, 1.0)
 
         self.batch_size = batch_size
         self.noise = noise
         self.max_action = torch.as_tensor(env.action_space.high, dtype=torch.float32, device=device)
         self.min_action = torch.as_tensor(env.action_space.low, dtype=torch.float32, device=device)
 
-        self.actor = Actor(input_dim=self.obs_shape, n_actions=self.n_actions, alpha=alpha, name='actor')
+        self.actor = Actor(self.obs_shape, self.n_actions, alpha, name='actor')
         self.critic = Critic(self.obs_shape + self.n_actions, beta, name='critic')
-        self.target_actor = Actor(input_dim=self.obs_shape, n_actions=self.n_actions, alpha=alpha, name='target_actor')
+        self.target_actor = Actor(self.obs_shape, self.n_actions, alpha, name='target_actor')
         self.target_critic = Critic(self.obs_shape + self.n_actions, beta, name='target_critic')
 
         if self.noise == 'normal':
-            self.noise_param = 0.1
+            self.noise_param: float = 0.1
             self.noise_scheduler = LinearSchedule(n_games, self.noise_param, self.noise_param / 20.0)
 
         else:
@@ -121,8 +123,7 @@ class Agent:
 
         self._update_networks()
 
-    def _update_networks(self):
-        tau = self.tau
+    def _update_networks(self, tau: float = 1.0):
 
         for critic_weights, target_critic_weights in zip(self.critic.parameters(), self.target_critic.parameters()):
             target_critic_weights.data.copy_(tau * critic_weights.data + (1.0 - tau) * target_critic_weights.data)
@@ -136,7 +137,7 @@ class Agent:
             noise = np.random.uniform(0.0, noise_param, action.shape)
             action += torch.as_tensor(noise, dtype=torch.float32, device=device)
 
-        return self._action_scaling(action)
+        return action
 
     def _action_scaling(self, action: torch.Tensor) -> torch.Tensor:
         neural_min = -1.0 * torch.ones_like(action)
@@ -151,7 +152,11 @@ class Agent:
         self.actor.eval()
         state = torch.as_tensor(observation, dtype=torch.float32, device=device)
         action = self.actor.forward(state)
-        action = self._add_exploration_noise(action)
+
+        if self.is_training:
+            action = self._add_exploration_noise(action)
+
+        action = self._action_scaling(action)
 
         return action.detach().cpu().numpy()
 
@@ -172,15 +177,14 @@ class Agent:
             return
 
         beta = self.beta_scheduler.value(self.optim_steps)
-        state, action, reward, new_state, done, weights, indices = self.memory.sample(
-            self.batch_size, beta)
+        state, action, reward, new_state, done, weights, indices = self.memory.sample(self.batch_size, beta)
 
         state = torch.as_tensor(np.vstack(state), dtype=torch.float32, device=device)
         action = torch.as_tensor(np.vstack(action), dtype=torch.float32, device=device)
         done = torch.as_tensor(np.vstack(1 - done), dtype=torch.float32, device=device)
         reward = torch.as_tensor(np.vstack(reward), dtype=torch.float32, device=device)
         new_state = torch.as_tensor(np.vstack(new_state), dtype=torch.float32, device=device)
-        weights = torch.as_tensor(np.vstack(weights), dtype=torch.float32, device=device)
+        weights = torch.as_tensor(weights, dtype=torch.float32, device=device)
 
         self.target_actor.eval()
         self.target_critic.eval()
@@ -193,7 +197,7 @@ class Agent:
 
         # Weight TD errors
         weighted_TD_errors = torch.mul(TD_errors, weights)
-        zero_tensor = torch.zeros_like(weighted_TD_errors, dtype=torch.float32)
+        zero_tensor = torch.zeros_like(weighted_TD_errors)
 
         # Compute & Update Critic losses
         critic_loss = F.mse_loss(weighted_TD_errors, zero_tensor)
@@ -205,7 +209,7 @@ class Agent:
         self.critic.eval()
 
         # Compute & Update Actor losses
-        actor_loss = -1.0 * self.critic.forward(state, self.actor(state)).mean()
+        actor_loss = torch.mean(-1.0 * self.critic.forward(state, self.actor(state)))
         self.actor.optimizer.zero_grad()
         actor_loss.backward()
         self.actor.optimizer.step()
@@ -214,6 +218,5 @@ class Agent:
         new_priorities = np.abs(td_errors) + 1e-6
         self.memory.update_priorities(indices, new_priorities)
 
-        self._update_networks()
-
-        self.optim_steps += 1.0
+        self._update_networks(self.tau)
+        self.optim_steps += 1

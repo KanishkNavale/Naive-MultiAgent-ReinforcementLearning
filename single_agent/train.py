@@ -1,5 +1,5 @@
+from typing import Dict, List
 import os
-import copy
 import json
 
 import numpy as np
@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from rl_agents.DDPG import Agent
 
 # Init. tensorboard summary writer
-tb = SummaryWriter(log_dir=os.path.abspath('data/tensorboard/'))
+tb = SummaryWriter(log_dir=os.path.abspath('single_agent/data/tensorboard'))
 
 
 if __name__ == '__main__':
@@ -20,41 +20,38 @@ if __name__ == '__main__':
     env.reset()
 
     # Init. Datapath
-    data_path = os.path.abspath('data')
+    data_path = os.path.abspath('single_agent/data')
 
     # Init. Training
+    n_games: int = 500
     best_score = -np.inf
-    score_history = []
-    avg_history = []
-    distance_history = []
-    n_games = 1000
-    logging_info = []
+    score_history: List[float] = [] * n_games
+    avg_history: List[float] = [] * n_games
+    logging_info: List[Dict[str, float]] = [] * n_games
 
     # Init. Agent
-    agent = Agent(env=env, datapath=data_path, n_games=n_games)
+    agent = Agent(env=env, datapath=data_path, n_games=n_games, training=True)
 
     for i in range(n_games):
-        score = 0
-        done = False
+        score: float = 0.0
+        done: bool = False
 
         # Initial Reset of Environment
         state = env.reset()
 
         while not done:
-            # Choose agent based action & make a transition
             action = agent.choose_action(state)
-            next_state, reward, done, _ = env.step(action)
 
+            next_state, reward, done, _ = env.step(action)
             agent.memory.add(state, action, reward, next_state, done)
 
-            state = copy.deepcopy(next_state)
+            state = next_state
             score += reward
 
-            # Optimize the agent
             agent.optimize()
 
         score_history.append(score)
-        avg_score = np.mean(score_history[-100:])
+        avg_score: float = np.mean(score_history[-100:])
         avg_history.append(avg_score)
 
         if avg_score > best_score:
@@ -79,8 +76,9 @@ if __name__ == '__main__':
         logging_info.append(episode_info)
 
         # Add info. to tensorboard
-        tb.add_scalars('training_rewards', {'Epidosic Summed Rewards': score,
-                       'Moving Mean of Episodic Rewards': avg_score, }, i)
+        tb.add_scalars('training_rewards',
+                       {'Epidosic Summed Rewards': score,
+                        'Moving Mean of Episodic Rewards': avg_score}, i)
 
         # Dump .json
         with open(os.path.join(data_path, 'training_info.json'), 'w', encoding='utf8') as file:

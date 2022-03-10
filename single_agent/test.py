@@ -16,14 +16,14 @@ if __name__ == '__main__':
     env.reset()
 
     # Init. Datapath
-    data_path = os.path.abspath('data')
+    data_path = os.path.abspath('single_agent/data')
 
     # Init. Testing
     n_games = 10
     test_data: List[Dict[str, np.ndarray]] = [] * n_games
 
     # Init. Agent
-    agent = Agent(env=env, datapath=data_path, n_games=10)
+    agent = Agent(env=env, datapath=data_path, n_games=n_games, training=False)
     agent.load_models()
 
     for i in tqdm(range(n_games), desc=f'Testing', total=n_games):
