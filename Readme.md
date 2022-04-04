@@ -2,4 +2,4 @@
 
 ## Single Agent Training & Testing
 
-<img src="single_agent/data/Single Agent Training & Testing.png">
+<img src="single_agent/data/DDPG Agent Profiling.png">
