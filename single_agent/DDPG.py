@@ -31,6 +31,7 @@ class Critic(torch.nn.Module):
         self.Q = torch.nn.Linear(density, 1, dtype=torch.float32)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=beta)
+        self.device = device
         self.to(device)
 
     def forward(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
@@ -68,6 +69,7 @@ class Actor(torch.nn.Module):
         self.mu = torch.nn.Linear(density, n_actions, dtype=torch.float32)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=alpha)
+        self.device = device
         self.to(device)
 
     def forward(self, state: torch.Tensor) -> torch.Tensor:

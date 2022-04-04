@@ -7,7 +7,7 @@ import numpy as np
 import gym
 from tqdm import tqdm
 
-from rl_agents.DDPG import Agent
+from DDPG import Agent
 
 if __name__ == '__main__':
 

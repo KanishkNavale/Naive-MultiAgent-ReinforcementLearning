@@ -7,7 +7,7 @@ import gym
 
 from torch.utils.tensorboard import SummaryWriter
 
-from rl_agents.DDPG import Agent
+from DDPG import Agent
 
 # Init. tensorboard summary writer
 tb = SummaryWriter(log_dir=os.path.abspath('single_agent/data/tensorboard'))
